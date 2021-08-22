@@ -44,24 +44,12 @@ def BatchIterator(
         imgs, labels, image_idx = data
 
         batch_size = imgs.shape[0]
-        #imgs = imgs.to(device)
-        #labels = labels.to(device)
-        imgs = imgs.cuda()
-        labels = labels.cuda()
-        print('Using device:', device)
-        print()
-
-        #Additional Info when using cuda
-        if device.type == 'cuda':
-            print(torch.cuda.get_device_name(0))
-            print('Memory Usage:')
-            print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
-            print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
+        imgs = imgs.to(device)
+        labels = labels.to(device)
 
         if phase == "train":
             optimizer.zero_grad()
             model.train()
-            #print(torch.cuda.memory_summary(device=None, abbreviated=False))
             outputs = model(imgs)
         else:
 
@@ -69,8 +57,6 @@ def BatchIterator(
             with torch.no_grad():
                 outputs = model(imgs)
 
-        #print(outputs[15])
-        #print(labels[15])
         loss = criterion(outputs, labels)
         #print(i, loss)
 

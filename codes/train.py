@@ -25,12 +25,12 @@ def ModelTrain(train_df_path, val_df_path, path_image, ModelType, CriterionType,
 
 
     # Training parameters
-    batch_size = 32
+    batch_size = 4
 
-    workers = 2  # mean: how many subprocesses to use for data loading.
+    workers = 1  # mean: how many subprocesses to use for data loading.
     N_LABELS = 14
     start_epoch = 0
-    num_epochs = 10  # number of epochs to train for (if early stopping is not triggered)
+    num_epochs = 100  # number of epochs to train for (if early stopping is not triggered)
     
     val_df = pd.read_csv(val_df_path)
     val_df_size = len(val_df)
@@ -156,7 +156,7 @@ def ModelTrain(train_df_path, val_df_path, path_image, ModelType, CriterionType,
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
     Saved_items(epoch_losses_train, epoch_losses_val, time_elapsed, batch_size)
     #
-    checkpoint_best = torch.load('results/checkpoint')
+    checkpoint_best = torch.load('../results/checkpoint')
     model = checkpoint_best['model']
 
     best_epoch = checkpoint_best['best_epoch']
