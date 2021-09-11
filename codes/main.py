@@ -58,7 +58,7 @@ def main():
         val_df = pd.read_csv(val_df_path)
         test_df = pd.read_csv(test_df_path)
 
-        CheckPointData = torch.load('results/checkpoint')
+        CheckPointData = torch.load('../results/checkpoint')
         model = CheckPointData['model']
 
         make_pred_multilabel(model, test_df, val_df, path_image, device)
@@ -74,8 +74,8 @@ def main():
         PlotLearnignCurve()
 
     if MODE == "plot":
-        gt = pd.read_csv("./results/True.csv")
-        pred = pd.read_csv("./results/bipred.csv")
+        gt = pd.read_csv("../results/True.csv")
+        pred = pd.read_csv("../results/bipred.csv")
         factor = [gender, age_decile]
         factor_str = ['Patient Gender', 'Patient Age']
         for i in range(len(factor)):

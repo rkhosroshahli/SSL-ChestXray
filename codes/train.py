@@ -30,7 +30,7 @@ def ModelTrain(train_df_path, val_df_path, path_image, ModelType, CriterionType,
     workers = 1  # mean: how many subprocesses to use for data loading.
     N_LABELS = 14
     start_epoch = 0
-    num_epochs = 100  # number of epochs to train for (if early stopping is not triggered)
+    num_epochs = 1  # number of epochs to train for (if early stopping is not triggered)
     
     val_df = pd.read_csv(val_df_path)
     val_df_size = len(val_df)
@@ -48,7 +48,7 @@ def ModelTrain(train_df_path, val_df_path, path_image, ModelType, CriterionType,
                                      std=[0.229, 0.224, 0.225])
 
     train_loader = torch.utils.data.DataLoader(
-        NIH(train_df, path_image=path_image, transform=transforms.Compose([
+        NIH(train_df[:4000], path_image=path_image, transform=transforms.Compose([
                                                                     transforms.RandomHorizontalFlip(),
                                                                     transforms.RandomRotation(10),
                                                                     transforms.Scale(256),
@@ -60,23 +60,24 @@ def ModelTrain(train_df_path, val_df_path, path_image, ModelType, CriterionType,
     print('Maximum iteration: ',len(train_loader))
 
     val_loader = torch.utils.data.DataLoader(
-        NIH(val_df,path_image=path_image, transform=transforms.Compose([
+        NIH(val_df[:200],path_image=path_image, transform=transforms.Compose([
                                                                 transforms.Scale(256),
                                                                 transforms.CenterCrop(256),
                                                                 transforms.ToTensor(),
                                                                 normalize
                                                             ])),
-        batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
+        batch_size=batch_size, shuffle=False, num_workers=workers, pin_memory=True)
 
     if ModelType == 'densenet':
         model = models.densenet121(pretrained=True)
         num_ftrs = model.classifier.in_features
+        #print(model.classifier)
 
-
-        model.classifier = nn.Sequential(nn.Linear(num_ftrs, N_LABELS), nn.Sigmoid())
+        #model.classifier = nn.Sequential(nn.Linear(num_ftrs, N_LABELS), nn.Sigmoid())
+        model.classifier = nn.Linear(num_ftrs, 100)
     
     if ModelType == 'ResNet50':
-        model = ResNet50NN()
+        model = models.resnet50()
 
     if ModelType == 'ResNet34':
         model = ResNet34NN()
@@ -86,7 +87,7 @@ def ModelTrain(train_df_path, val_df_path, path_image, ModelType, CriterionType,
         
 
     if ModelType == 'Resume':
-        CheckPointData = torch.load('results/checkpoint')
+        CheckPointData = torch.load('../results/checkpoint')
         model = CheckPointData['model']
 
 
@@ -98,7 +99,7 @@ def ModelTrain(train_df_path, val_df_path, path_image, ModelType, CriterionType,
     model = model.to(device)
     
     if CriterionType == 'BCELoss':
-        criterion = nn.BCELoss().to(device)
+        criterion = nn.BCEWithLogitsLoss().to(device)
 
     epoch_losses_train = []
     epoch_losses_val = []
@@ -134,7 +135,7 @@ def ModelTrain(train_df_path, val_df_path, path_image, ModelType, CriterionType,
             checkpoint(model, best_loss, best_epoch, LR)
 
                 # log training and validation loss over each epoch
-        with open("results/log_train", 'a') as logfile:
+        with open("../results/log_train", 'a') as logfile:
             logwriter = csv.writer(logfile, delimiter=',')
             if (epoch == 1):
                 logwriter.writerow(["epoch", "train_loss", "val_loss","Seed","LR"])

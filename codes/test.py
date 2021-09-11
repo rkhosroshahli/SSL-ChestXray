@@ -21,17 +21,17 @@ def make_pred_multilabel(model, test_df, val_df, path_image, device):
         auc_df: dataframe containing aggregate AUCs by train/test tuples
     """
 
-    BATCH_SIZE = 32
-    workers = 12
+    BATCH_SIZE = 4
+    workers = 1
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-    dataset_test = NIH(test_df, path_image=path_image, transform=transforms.Compose([
+    dataset_test = NIH(test_df[:1000], path_image=path_image, transform=transforms.Compose([
         transforms.Scale(256),
         transforms.CenterCrop(256),
         transforms.ToTensor(),
         normalize]))
-    test_loader = torch.utils.data.DataLoader(dataset_test, BATCH_SIZE, shuffle=True, num_workers=workers,
+    test_loader = torch.utils.data.DataLoader(dataset_test, BATCH_SIZE, shuffle=False, num_workers=workers,
                                               pin_memory=True)
 
     dataset_val = NIH(val_df, path_image=path_image, transform=transforms.Compose([
@@ -39,7 +39,7 @@ def make_pred_multilabel(model, test_df, val_df, path_image, device):
         transforms.CenterCrop(256),
         transforms.ToTensor(),
         normalize]))
-    val_loader = torch.utils.data.DataLoader(dataset_val, BATCH_SIZE, shuffle=True, num_workers=workers,
+    val_loader = torch.utils.data.DataLoader(dataset_val, BATCH_SIZE, shuffle=False, num_workers=workers,
                                              pin_memory=True)
 
     size = len(test_df)
@@ -84,7 +84,7 @@ def make_pred_multilabel(model, test_df, val_df, path_image, device):
             loader = test_loader
             TestEval_df = pd.DataFrame(columns=["label", 'auc', "auprc"])
 
-            Eval = pd.read_csv("./results/Threshold.csv")
+            Eval = pd.read_csv("../results/Threshold.csv")
             thrs = [Eval["bestthr"][Eval[Eval["label"] == "Atelectasis"].index[0]],
                     Eval["bestthr"][Eval[Eval["label"] == "Cardiomegaly"].index[0]],
                     Eval["bestthr"][Eval[Eval["label"] == "Effusion"].index[0]],
@@ -112,7 +112,7 @@ def make_pred_multilabel(model, test_df, val_df, path_image, device):
 
             model.eval()
             with torch.no_grad():
-                outputs = model(inputs)
+                outputs = torch.sigmoid(model(inputs))
                 probs = outputs.cpu().data.numpy()
 
             # get predictions and true values for each item in batch
@@ -131,6 +131,7 @@ def make_pred_multilabel(model, test_df, val_df, path_image, device):
                 for k in range(len(PRED_LABEL)):
                     thisrow["prob_" + PRED_LABEL[k]] = probs[j, k]
                     truerow[PRED_LABEL[k]] = true_labels[j, k]
+                    #print(probs[j, k], true_labels[j, k])
 
                     if mode == "test":
                        bi_thisrow["bi_" + PRED_LABEL[k]] = probs[j, k] >= thrs[k]
@@ -179,14 +180,15 @@ def make_pred_multilabel(model, test_df, val_df, path_image, device):
                 
 
                 if mode == "test":
+
                     thisrow['auc'] = sklm.roc_auc_score(
-                        actual.as_matrix().astype(int), pred.as_matrix())
+                        actual.values.astype(int), pred.values)
 
                     thisrow['auprc'] = sklm.average_precision_score(
-                        actual.as_matrix().astype(int), pred.as_matrix())
+                        actual.values.astype(int), pred.values)
                 else:
 
-                    p, r, t = sklm.precision_recall_curve(actual.as_matrix().astype(int), pred.as_matrix())
+                    p, r, t = sklm.precision_recall_curve(actual.values.astype(int), pred.values)
                     # Choose the best threshold based on the highest F1 measure
                     f1 = np.multiply(2, np.divide(np.multiply(p, r), np.add(r, p)))
                     bestthr = t[np.where(f1 == max(f1))]
@@ -196,7 +198,11 @@ def make_pred_multilabel(model, test_df, val_df, path_image, device):
 
 
             except BaseException:
-                print("can't calculate auc for " + str(column))
+                print("can't calculate auc for " + str(column) + "in "+mode+" mode")
+
+
+            #except BaseException:
+                #print("can't calculate auc for " + str(column))
 
             if mode == "Threshold":
                 Eval_df = Eval_df.append(thisrow, ignore_index=True)
@@ -204,16 +210,16 @@ def make_pred_multilabel(model, test_df, val_df, path_image, device):
             if mode == "test":
                 TestEval_df = TestEval_df.append(thisrow, ignore_index=True)
 
-        pred_df.to_csv("results/preds.csv", index=False)
-        true_df.to_csv("results/True.csv", index=False)
+        pred_df.to_csv("../results/preds.csv", index=False)
+        true_df.to_csv("../results/True.csv", index=False)
 
 
         if mode == "Threshold":
-            Eval_df.to_csv("results/Threshold.csv", index=False)
+            Eval_df.to_csv("../results/Threshold.csv", index=False)
 
         if mode == "test":
-            TestEval_df.to_csv("results/TestEval.csv", index=False)
-            bi_pred_df.to_csv("results/bipred.csv", index=False)
+            TestEval_df.to_csv("../results/TestEval.csv", index=False)
+            bi_pred_df.to_csv("../results/bipred.csv", index=False)
 
     
     print("AUC ave:", TestEval_df['auc'].sum() / 14.0)
