@@ -2,6 +2,8 @@ import torch
 from utils import *
 import numpy as np
 import pandas as pd
+from sklearn.cluster import SpectralCoclustering
+from sklearn.metrics.cluster import normalized_mutual_info_score
 #from evaluation import *
 
 def BatchIterator(
@@ -52,13 +54,33 @@ def BatchIterator(
             model.train()
             outputs = model(imgs)
         else:
-
             model.eval()
             with torch.no_grad():
                 outputs = model(imgs)
 
+        preds = outputs
+
+        m = torch.nn.Linear(100, 14).to(device)
+        out = m(outputs)
+        outputs = torch.sigmoid(out)
+
         loss = criterion(outputs, labels)
-        #print(i, loss)
+
+        clustering = SpectralCoclustering(n_clusters=14, random_state=0).fit(preds.cpu().detach().numpy())
+        rows = clustering.rows_.T
+        rows= 1*rows
+
+        nmis = 0
+        for i in range(rows.shape[0]):
+            nmi = normalized_mutual_info_score(labels.cpu().detach().numpy()[i], rows[i])
+            nmis += nmi
+        nmis_mean = nmis/rows.shape[0]
+
+        final_loss = (loss +nmis_mean) / 2
+        print("Classification loss: ", loss)
+        print("Clustering loss: ", nmis_mean)
+
+        print("Final loss: ", final_loss)
 
         if phase == 'train':
 
@@ -67,12 +89,12 @@ def BatchIterator(
                 clip_gradient(optimizer, grad_clip)
             optimizer.step()  # update weights
 
-        running_loss += loss * batch_size
+        running_loss += final_loss * batch_size
         #if (i % 200 == 0):
             #print(str(i * batch_size))
 
         if phase == 'pseudo_label':
-            Eval = pd.read_csv("./results/Threshold.csv")
+            Eval = pd.read_csv("../results/Threshold.csv")
             thrs = [Eval["bestthr"][Eval[Eval["label"] == "Atelectasis"].index[0]],
                     Eval["bestthr"][Eval[Eval["label"] == "Cardiomegaly"].index[0]],
                     Eval["bestthr"][Eval[Eval["label"] == "Effusion"].index[0]],
