@@ -7,20 +7,22 @@ from nih import plot_sort_median
 
 import pandas as pd
 
-#---------------------- on q
+# ---------------------- on q
 path_image = "../images/"
 
-train_df_path ="../datas/train.csv"
+train_lbl_df_path = "../datas/train_labeled.csv"
+train_unlbl_df_path = "../datas/train_unlabeled.csv"
 test_df_path = "../datas/test.csv"
 val_df_path = "../datas/val.csv"
 
 
 diseases = ['Atelectasis', 'Cardiomegaly', 'Consolidation', 'Edema',
-       'Effusion', 'Emphysema', 'Fibrosis', 'Hernia', 'Infiltration', 'Mass',
-       'Nodule', 'Pleural_Thickening', 'Pneumonia', 'Pneumothorax']
+            'Effusion', 'Emphysema', 'Fibrosis', 'Hernia', 'Infiltration', 'Mass',
+            'Nodule', 'Pleural_Thickening', 'Pneumonia', 'Pneumothorax']
 # age_decile = ['0-20', '20-40', '40-60', '60-80', '80-']
 age_decile = ['40-60', '60-80', '20-40', '80-', '0-20']
 gender = ['M', 'F']
+
 
 def main():
 
@@ -28,17 +30,21 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    train_df = pd.read_csv(train_df_path)
-    train_df_size = len(train_df)
-    print("Train_df path", train_df_size)
+    train_lbl_df = pd.read_csv(train_lbl_df_path)
+    train_df_size = len(train_lbl_df)
+    print("Train labeled size", train_df_size)
+
+    train_unlbl_df = pd.read_csv(train_unlbl_df_path)
+    train_df_size = len(train_unlbl_df)
+    print("Train unlabeled size", train_df_size)
 
     test_df = pd.read_csv(test_df_path)
     test_df_size = len(test_df)
-    print("test_df path", test_df_size)
+    print("Test size", test_df_size)
 
     val_df = pd.read_csv(val_df_path)
     val_df_size = len(val_df)
-    print("val_df path", val_df_size)
+    print("Validation size", val_df_size)
 
     if MODE == "train":
         ModelType = "densenet"  # select 'ResNet50','densenet','ResNet34', 'ResNet18'
@@ -50,15 +56,16 @@ def main():
         test_df = pd.read_csv(test_df_path)
 
         for i in range(100):
-            print('Epoch {}/{}'.format(i, num_epochs))
 
-            model, best_epoch = ModelTrain(train_df_path, val_df_path, path_image, ModelType, CriterionType, device, LR)
+            model, best_epoch = ModelTrain(
+                train_lbl_df, train_unlbl_df, val_df, path_image, ModelType, CriterionType, device, LR)
 
             PlotLearnignCurve()
 
-            make_pred_multilabel(model, test_df, val_df, path_image, ModelType_pred, device)
+            make_pred_multilabel(model, test_df, val_df,
+                                 path_image, ModelType_pred, device)
 
-    if MODE =="test":
+    if MODE == "test":
         ModelType_pred = "test"
         val_df = pd.read_csv(val_df_path)
         test_df = pd.read_csv(test_df_path)
@@ -66,15 +73,16 @@ def main():
         CheckPointData = torch.load('results/checkpoint')
         model = CheckPointData['model']
 
-        make_pred_multilabel(model, test_df, val_df, path_image, ModelType_pred, device)
-
+        make_pred_multilabel(model, test_df, val_df,
+                             path_image, ModelType_pred, device)
 
     if MODE == "Resume":
         ModelType = "Resume"  # select 'ResNet50','densenet','ResNet34', 'ResNet18'
         CriterionType = 'BCELoss'
         LR = 0.5e-3
 
-        model, best_epoch = ModelTrain(train_df_path, val_df_path, path_image, result_path, ModelType, CriterionType, device,LR)
+        model, best_epoch = ModelTrain(
+            train_lbl_df, train_unlbl_df, val_df, path_image, ModelType, CriterionType, device, LR)
 
         PlotLearnignCurve()
 
