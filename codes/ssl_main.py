@@ -62,8 +62,8 @@ def main():
 
             PlotLearnignCurve()
 
-            make_pred_multilabel(model, test_df, val_df,
-                                 path_image, ModelType_pred, device)
+            # make_pred_multilabel(model, test_df, val_df,
+            # path_image, ModelType_pred, device)
 
     if MODE == "test":
         ModelType_pred = "test"

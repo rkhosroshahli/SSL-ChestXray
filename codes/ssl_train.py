@@ -15,6 +15,7 @@ import time
 import csv
 import os
 from clustering import Clustering_model
+from network import DenseNet121
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 warnings.filterwarnings("ignore")
 #from ResNetModel import *
@@ -23,13 +24,13 @@ warnings.filterwarnings("ignore")
 def ModelTrain(train_lbl_df, train_unlbl_df, val_df, path_image, ModelType, CriterionType, device, LR):
 
     # Training parameters
-    batch_size = 32
+    batch_size = 4
 
-    workers = 8  # mean: how many subprocesses to use for data loading.
+    workers = 1  # mean: how many subprocesses to use for data loading.
     N_LABELS = 14
     start_epoch = 0
     # number of epochs to train for (if early stopping is not triggered)
-    num_epochs = 100
+    num_epochs = 10
 
     train_lbl_df = train_lbl_df.filter(
         ['Image Index', 'Finding Labels'], axis=1)
@@ -58,11 +59,15 @@ def ModelTrain(train_lbl_df, train_unlbl_df, val_df, path_image, ModelType, Crit
         batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=False)
 
     if ModelType == 'densenet':
-        model = models.densenet121(pretrained=True)
-        num_ftrs = model.classifier.in_features
+        # model = models.densenet121(pretrained=True)
+        # num_ftrs = model.classifier.in_features
 
-        model.classifier = nn.Sequential(
-            nn.Linear(num_ftrs, N_LABELS), nn.Sigmoid())
+        # model_2 = model
+        # model.classifier = nn.Sequential(
+        #     nn.Linear(1024, 512), nn.ReLU(),
+        #     nn.Linear(512, 128), nn.ReLU(),
+        #     nn.Linear(128, 14), nn.Sigmoid())
+        model = DenseNet121(out_size=N_LABELS, drop_rate=0.2)
 
     if ModelType == 'ResNet50':
         model = ResNet50NN()
@@ -139,57 +144,49 @@ def ModelTrain(train_lbl_df, train_unlbl_df, val_df, path_image, ModelType, Crit
             ])),
             batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=False)
 
-        train_loader_cluster = torch.utils.data.DataLoader(
-            NIH(train_ssl_df, path_image=path_image, transform=transforms.Compose([
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomRotation(10),
-                transforms.Scale(256),
-                transforms.CenterCrop(256),
-                transforms.ToTensor(),
-                normalize
-            ])),
-            batch_size=4000, shuffle=True, num_workers=workers, pin_memory=False)
-
     # -------------------------- Start of phase
         #model = model_2
         phase = 'train'
         # Classification loss calculation
         optimizer = torch.optim.Adam(params=filter(
             lambda p: p.requires_grad, model.parameters()), lr=LR)
-        running_loss = BatchIterator(model=model, phase=phase, Data_loader=train_loader,
-                                     criterion=criterion, optimizer=optimizer, device=device)
+        running_loss, train_features, train_labels = BatchIterator(model=model, phase=phase, Data_loader=train_loader,
+                                                                   criterion=criterion, optimizer=optimizer, device=device)
         epoch_loss_train = running_loss / train_df_size
         epoch_losses_train.append(epoch_loss_train.item())
         print("Train_losses:", epoch_losses_train)
 
         # Clustering loss calculation
         nmi_loss = Clustering_model(
-            train_loader_cluster, model, optimizer, device)
+            np.array(train_features), np.array(train_labels), batch_size)
+
         print(print("Clustering loss: ", nmi_loss))
-        coloss = (running_loss + nmi_loss)/2
+
+        coloss = (epoch_loss_train + nmi_loss)/2
+
         print(print("Final loss: ", coloss))
 
-        break  # dont need pseudo labeling
+        # dont need pseudo labeling
 
         # a function to find pseudo labels for trained images
 
         phase = 'val'
         optimizer = torch.optim.Adam(params=filter(
             lambda p: p.requires_grad, model.parameters()), lr=LR)
-        running_loss = BatchIterator(model=model, phase=phase, Data_loader=val_loader,
-                                     criterion=criterion, optimizer=optimizer, device=device)
+        running_loss, _, _ = BatchIterator(model=model, phase=phase, Data_loader=val_loader,
+                                           criterion=criterion, optimizer=optimizer, device=device)
         epoch_loss_val = running_loss / val_df_size
         epoch_losses_val.append(epoch_loss_val.item())
         print("Validation_losses:", epoch_losses_val)
 
-        phase = 'pseudo_label'
-        optimizer = torch.optim.Adam(params=filter(
-            lambda p: p.requires_grad, model.parameters()), lr=LR)
-        pseudo_image_idx, pseudo_labels, running_loss = BatchIterator(
-            model=model, phase=phase, Data_loader=unlabeled_loader, criterion=criterion, optimizer=optimizer, device=device)
-        epoch_loss_pl = running_loss / unlabeled_size
-        epoch_losses_pl.append(epoch_loss_pl.item())
-        print("Pseudo Labels_losses:", epoch_losses_pl)
+        # phase = 'pseudo_label'
+        # optimizer = torch.optim.Adam(params=filter(
+        #     lambda p: p.requires_grad, model.parameters()), lr=LR)
+        # pseudo_image_idx, pseudo_labels, running_loss = BatchIterator(
+        #     model=model, phase=phase, Data_loader=unlabeled_loader, criterion=criterion, optimizer=optimizer, device=device)
+        # epoch_loss_pl = running_loss / unlabeled_size
+        # epoch_losses_pl.append(epoch_loss_pl.item())
+        # print("Pseudo Labels_losses:", epoch_losses_pl)
 
         # checkpoint model if has best val loss yet
         if epoch_loss_val < best_loss:
@@ -224,7 +221,7 @@ def ModelTrain(train_lbl_df, train_unlbl_df, val_df, path_image, ModelType, Crit
         time_elapsed // 60, time_elapsed % 60))
     Saved_items(epoch_losses_train, epoch_losses_val, time_elapsed, batch_size)
     #
-    checkpoint_best = torch.load('results/checkpoint')
+    checkpoint_best = torch.load('../results/checkpoint')
     model = checkpoint_best['model']
 
     best_epoch = checkpoint_best['best_epoch']

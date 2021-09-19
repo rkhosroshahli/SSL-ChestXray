@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn.functional import leaky_relu
 from utils import *
 import numpy as np
 import pandas as pd
@@ -16,7 +17,7 @@ def BatchIterator(
     Data_loader,
     criterion,
     optimizer,
-    device
+    device,
 ):
 
     # --------------------  Initial paprameterd
@@ -43,10 +44,20 @@ def BatchIterator(
     pseudo_labels = []
     pseudo_indexes = []
 
+    seq = nn.Sequential(
+        nn.Linear(1024, 512), nn.ReLU(),
+        nn.Linear(512, 128), nn.ReLU(),
+        nn.Linear(128, 14), nn.Sigmoid()).to(device)
+
+    train_features = np.empty(shape=(0, 1024))
+    train_labels = np.empty(shape=(0, 14))
+
     for i, data in enumerate(Data_loader):
 
         imgs, labels, image_idx = data
 
+        train_labels = np.append(
+            train_labels, labels.cpu().detach().numpy(), axis=0)
         batch_size = imgs.shape[0]
         imgs = imgs.to(device)
         labels = labels.to(device)
@@ -54,30 +65,17 @@ def BatchIterator(
         if phase == "train":
             optimizer.zero_grad()
             model.train()
-            outputs = model(imgs)
+            features, outputs = model(imgs)
         else:
             model.eval()
             with torch.no_grad():
-                outputs = model(imgs)
+                features, outputs = model(imgs)
 
-        #preds = outputs
+        features = features.cpu().detach().numpy()
+        train_features = np.append(train_features, features, axis=0)
 
-        seq = nn.Sequential(
-            nn.Linear(1024, 512), nn.ReLU(),
-            nn.Linear(512, 128), nn.ReLU(),
-            nn.Linear(128, 14), nn.Sigmoid()).to(device)
-
-        model.classifier = seq
-        model.train()
-        outputs_sgd = model(imgs)
-
-        #m = torch.nn.Linear(1024, 14).to(device)
-        # print(outputs_sgd.size())
-        #out = seq(outputs)
-        #output = torch.sigmoid(out)
-
-        loss = criterion(outputs_sgd, labels)
-        print(loss)
+        loss = criterion(outputs, labels)
+        # print(loss)
 
         # featured_out = outputs.cpu().detach().numpy()
         # cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
@@ -170,4 +168,4 @@ def BatchIterator(
     if phase == 'pseudo_label':
         return pseudo_indexes, pseudo_labels, running_loss
 
-    return running_loss
+    return running_loss, train_features, train_labels

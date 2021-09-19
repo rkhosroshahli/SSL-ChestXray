@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore")
 def ModelTrain(train_df, val_df, path_image, ModelType, CriterionType, device, LR):
 
     # Training parameters
-    batch_size = 2
+    batch_size = 4
 
     workers = 1  # mean: how many subprocesses to use for data loading.
     N_LABELS = 14
