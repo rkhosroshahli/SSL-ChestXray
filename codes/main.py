@@ -10,20 +10,21 @@ import os
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2'
 
-#---------------------- on q
+# ---------------------- on q
 path_image = "../images/"
 
-train_df_path ="../datas/train.csv"
+train_df_path = "../datas/train.csv"
 test_df_path = "../datas/test.csv"
 val_df_path = "../datas/val.csv"
 
 
 diseases = ['Atelectasis', 'Cardiomegaly', 'Consolidation', 'Edema',
-       'Effusion', 'Emphysema', 'Fibrosis', 'Hernia', 'Infiltration', 'Mass',
-       'Nodule', 'Pleural_Thickening', 'Pneumonia', 'Pneumothorax']
+            'Effusion', 'Emphysema', 'Fibrosis', 'Hernia', 'Infiltration', 'Mass',
+            'Nodule', 'Pleural_Thickening', 'Pneumonia', 'Pneumothorax']
 # age_decile = ['0-20', '20-40', '40-60', '60-80', '80-']
 age_decile = ['40-60', '60-80', '20-40', '80-', '0-20']
 gender = ['M', 'F']
+
 
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -49,12 +50,12 @@ def main():
         CriterionType = 'BCELoss'
         LR = 0.5e-3
 
-        model, best_epoch = ModelTrain(train_df_path, val_df_path, path_image, ModelType, CriterionType, device, LR)
+        model, best_epoch = ModelTrain(
+            train_df, val_df, path_image, ModelType, CriterionType, device, LR)
 
         PlotLearnignCurve()
 
-
-    if MODE =="test":
+    if MODE == "test":
         val_df = pd.read_csv(val_df_path)
         test_df = pd.read_csv(test_df_path)
 
@@ -63,13 +64,13 @@ def main():
 
         make_pred_multilabel(model, test_df, val_df, path_image, device)
 
-
     if MODE == "Resume":
         ModelType = "Resume"  # select 'ResNet50','densenet','ResNet34', 'ResNet18'
         CriterionType = 'BCELoss'
         LR = 0.5e-3
 
-        model, best_epoch = ModelTrain(train_df_path, val_df_path, path_image, result_path, ModelType, CriterionType, device,LR)
+        model, best_epoch = ModelTrain(
+            train_df, val_df, path_image, ModelType, CriterionType, device, LR)
 
         PlotLearnignCurve()
 
